@@ -27,7 +27,7 @@ def create_default_argument_parser(dataset_name):
     parser = argparse.ArgumentParser(
         description="Metric trainer (%s)" % dataset_name)
     parser.add_argument(
-        "--batch_size", help="Training batch size", default=128, type=int)
+        "--batch_size", help="Training batch size", default=32, type=int)
     parser.add_argument(
         "--learning_rate", help="Learning rate", default=1e-3, type=float)
     parser.add_argument(
@@ -507,14 +507,39 @@ def freeze(preprocess_fn, network_factory, checkpoint_path, image_shape,
 
     """
     with tf.Session(graph=tf.Graph()) as session:
+
+        tf.enable_control_flow_v2()
+        # input_var = tf.placeholder(
+        #     tf.uint8, (None, ) + image_shape, name=input_name)
         input_var = tf.placeholder(
-            tf.uint8, (None, ) + image_shape, name=input_name)
+            tf.float32, (None, ) + image_shape, name=input_name)
         image_var = tf.map_fn(
             lambda x: preprocess_fn(x, is_training=False),
             input_var, back_prop=False, dtype=tf.float32)
         features, _ = network_factory(image_var)
         features = tf.identity(features, name=feature_name)
 
+        inputs = {"images": tf.get_default_graph().get_tensor_by_name('images:0')}
+        outputs = {"features": tf.get_default_graph().get_tensor_by_name('features:0')}
+        #import pdb;pdb.set_trace()
+        # tf.saved_model.simple_save(
+        #          session, "saved_model/", inputs, outputs
+        #      )
+        tensor_info_x = tf.saved_model.utils.build_tensor_info(input_var)
+        tensor_info_y = tf.saved_model.utils.build_tensor_info(features)
+        prediction_signature = (
+            tf.saved_model.signature_def_utils.build_signature_def(
+                inputs={'x_input': tensor_info_x},
+                outputs={'y_output': tensor_info_y},
+                method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME))
+        builder = tf.saved_model.builder.SavedModelBuilder("saved_model")
+        #tf.initialize_all_variables().run()
+        tf.global_variables_initializer().run()
+        tf.compat.v1.enable_resource_variables()
+        builder.add_meta_graph_and_variables(session, [tf.saved_model.tag_constants.SERVING], signature_def_map={tf.saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: prediction_signature })
+        builder.save()
+
+     
         saver = tf.train.Saver(slim.get_variables_to_restore())
         saver.restore(session, checkpoint_path)
 
