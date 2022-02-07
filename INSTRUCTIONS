@@ -1,0 +1,12 @@
+quick and dirty:
+
+1) edit train_mars.py and update IMAGE_SHAPE (it's height, width, depth)
+2) look at run.sh to find the /checkpoints directory
+3) make sure the RUNID is not already taken
+4) edit train.sh and change the RUNID to something appropriate, e.g. mars-128x64x3
+5) ./run.sh ./train.sh
+6) edit finalize.sh, change the RUNID, then ./run.sh it
+7) make sure saved_model/ dir is removed or moved out of the way
+8) edit freeze.sh, change the RUNID, then ./run.sh it
+9) ./run.sh python3 tflite_convert.py
+10) there should be a new converted_model.tflite file
